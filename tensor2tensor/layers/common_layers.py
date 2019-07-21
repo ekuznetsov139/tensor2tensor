@@ -35,6 +35,16 @@ from tensorflow.python.ops import control_flow_util
 from tensorflow.python.ops import inplace_ops
 
 
+
+try:
+  from tensorflow.contrib.t2t.python.ops import t2t_ops
+  from tensorflow.contrib.t2t.python.ops import gen_t2t_ops
+  use_custom_l2 = True
+  use_custom_dropout=True
+except:
+  use_custom_l2 = False
+  use_custom_dropout=False
+
 _cached_layers = None
 
 
@@ -119,15 +129,22 @@ def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
     Tensor of the same shape as x.
   """
   assert "noise_shape" not in kwargs
+  shape = tf.shape(x)
+  ndims = len(x.get_shape())
   if broadcast_dims:
-    shape = tf.shape(x)
-    ndims = len(x.get_shape())
     # Allow dimensions like "-1" as well.
     broadcast_dims = [dim + ndims if dim < 0 else dim for dim in broadcast_dims]
-    kwargs["noise_shape"] = [
-        1 if i in broadcast_dims else shape[i] for i in range(ndims)
-    ]
-  return tf.nn.dropout(x, keep_prob, **kwargs)
+    shape = [1 if i in broadcast_dims else shape[i] for i in range(ndims)]
+    kwargs["noise_shape"] = shape
+  #return x
+  if use_custom_dropout and (ndims==2 or ndims==3):
+    zero = tf.constant(0.0, dtype=x.dtype)
+    one = tf.constant(1.0, dtype=x.dtype)
+    rng = tf.random.uniform(shape, minval=zero, maxval=one, dtype=x.dtype)
+    return gen_t2t_ops.custom_dropout(x, rng, tf.cast(1.-keep_prob, x.dtype))
+  else:
+    #print('Missing dropout for ', x.get_shape(), broadcast_dims)
+    return tf.nn.dropout(x, keep_prob, **kwargs)
 
 
 def comma_separated_string_to_integer_list(s):
@@ -697,21 +714,17 @@ def layer_norm_vars(filters):
 
 def layer_norm_compute(x, epsilon, scale, bias, layer_collection=None):
   """Layer norm raw computation."""
-
   # Save these before they get converted to tensors by the casting below
   params = (scale, bias)
 
   epsilon, scale, bias = [cast_like(t, x) for t in [epsilon, scale, bias]]
-  mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
-  variance = tf.reduce_mean(
-      tf.squared_difference(x, mean), axis=[-1], keepdims=True)
-  norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
-
-  output = norm_x * scale + bias
-
-
-  return output
-
+  if use_custom_l2:
+    return gen_t2t_ops.custom_l2_norm(x, epsilon, scale, bias)
+  else:
+    mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
+    sqds = tf.math.square(x-mean)
+    variance = tf.reduce_mean(sqds, axis=[-1], keepdims=True)
+    return (x - mean) * scale * tf.rsqrt(variance + epsilon) + bias
 
 def layer_norm(x,
                filters=None,

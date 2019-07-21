@@ -366,8 +366,18 @@ def compute_topk_scores_and_seq(sequences,
     topk_flags = gather(flags, "_topk_flags")
     topk_gathered_scores = gather(scores_to_gather, "_topk_scores")
     if states_to_gather:
+      for x in states_to_gather:
+        if tf.is_tensor(states_to_gather[x]):
+          states_to_gather[x]=tf.to_float(states_to_gather[x])
+        else:
+          print(x)
+          print(states_to_gather[x])
+          for y in states_to_gather[x]:
+            if x.startswith('layer') and (y=='k' or y=='v'):
+              states_to_gather[x][y]=tf.to_float(states_to_gather[x][y])
       topk_gathered_states = nest.map_structure(
           lambda state: gather(state, "_topk_states"), states_to_gather)
+      #print(topk_gathered_states)
     else:
       topk_gathered_states = states_to_gather
   else:
@@ -510,10 +520,10 @@ def beam_search(symbols_to_logits_fn,
 
     # Set the scores of the unfinished seq in curr_seq to large negative
     # values
-    curr_scores += (1. - tf.to_float(curr_finished)) * -INF
+    curr_scores += tf.cast((1. - tf.to_float(curr_finished)) * -INF, curr_scores.dtype)
     # concatenating the sequences and scores along beam axis
     curr_finished_seq = tf.concat([finished_seq, curr_seq], axis=1)
-    curr_finished_scores = tf.concat([finished_scores, curr_scores], axis=1)
+    curr_finished_scores = tf.concat([finished_scores, tf.to_float(curr_scores)], axis=1)
     curr_finished_flags = tf.concat([finished_flags, curr_finished], axis=1)
     return compute_topk_scores_and_seq(
         curr_finished_seq,
@@ -546,7 +556,7 @@ def beam_search(symbols_to_logits_fn,
     """
     # Set the scores of the finished seq in curr_seq to large negative
     # values
-    curr_scores += tf.to_float(curr_finished) * -INF
+    curr_scores = tf.cast(curr_scores, tf.float32) + tf.cast(tf.to_float(curr_finished) * -INF, tf.float32)
     return compute_topk_scores_and_seq(curr_seq, curr_scores, curr_log_probs,
                                        curr_finished, beam_size, batch_size,
                                        "grow_alive", states, use_tpu=use_tpu)
@@ -595,9 +605,11 @@ def beam_search(symbols_to_logits_fn,
       flat_logits = symbols_to_logits_fn(flat_ids, i)
     else:
       flat_logits = symbols_to_logits_fn(flat_ids)
+    #if flat_logits.dtype == tf.float16:
+    #  flat_logits = tf.cast(flat_logits, tf.float32)
 
     logits = tf.reshape(flat_logits, [batch_size, beam_size, -1])
-
+    alive_log_probs = tf.cast(alive_log_probs, logits.dtype)
     # Convert logits to normalized log probs
     candidate_log_probs = common_layers.log_prob_from_logits(logits)
 
@@ -607,7 +619,7 @@ def beam_search(symbols_to_logits_fn,
 
     length_penalty = tf.pow(((5. + tf.to_float(i + 1)) / 6.), alpha)
 
-    curr_scores = log_probs / length_penalty
+    curr_scores = tf.to_float(log_probs) / length_penalty
     # Flatten out (beam_size, vocab_size) probs in to a list of possibilities
     flat_curr_scores = tf.reshape(curr_scores, [-1, beam_size * vocab_size])
 
@@ -618,7 +630,7 @@ def beam_search(symbols_to_logits_fn,
       topk_scores, topk_ids = tf.nn.top_k(flat_curr_scores, k=beam_size * 2)
 
     # Recovering the log probs because we will need to send them back
-    topk_log_probs = topk_scores * length_penalty
+    topk_log_probs = tf.to_float(topk_scores) * length_penalty
 
     # Work out what beam the top probs are in.
     topk_beam_index = topk_ids // vocab_size
@@ -715,12 +727,16 @@ def beam_search(symbols_to_logits_fn,
     # 3. Recompute the contents of finished based on scores.
     topk_seq, topk_log_probs, topk_scores, topk_finished, states = grow_topk(
         i, alive_seq, alive_log_probs, states)
+    #topk_log_probs=tf.to_float(topk_log_probs)
+    #topk_scores=tf.to_float(topk_scores)
+    #print(topk_seq, topk_log_probs, topk_scores, topk_finished)
     alive_seq, alive_log_probs, _, states = grow_alive(
         topk_seq, topk_scores, topk_log_probs, topk_finished, states)
+    #print(alive_seq, alive_log_probs)
     finished_seq, finished_scores, finished_flags, _ = grow_finished(
         finished_seq, finished_scores, finished_flags, topk_seq, topk_scores,
         topk_finished)
-
+    #print(finished_seq, finished_scores, finished_flags)
     return (i + 1, alive_seq, alive_log_probs, finished_seq, finished_scores,
             finished_flags, states)
 
@@ -779,6 +795,16 @@ def beam_search(symbols_to_logits_fn,
     state_struc = nest.map_structure(lambda state: state.get_shape(), states)
   else:
     state_struc = nest.map_structure(get_state_shape_invariants, states)
+  for x in states:
+    if tf.is_tensor(states[x]):
+      states[x]=tf.to_float(states[x])
+  #    print(x, states[x])
+  #  elif x.startswith('layer'):
+  #    states[x]['k']=tf.to_float(states[x]['k'])
+  #    states[x]['v']=tf.to_float(states[x]['v'])
+  #    print(x, states[x])
+  #  else:
+  #    print(x, states[x])
   (_, alive_seq, alive_log_probs, finished_seq, finished_scores,
    finished_flags, states) = tf.while_loop(
        _is_finished,
@@ -796,7 +822,7 @@ def beam_search(symbols_to_logits_fn,
            state_struc
        ],
        parallel_iterations=1,
-       back_prop=False)
+       back_prop=False, name="Chicken")
 
   alive_seq.set_shape((None, beam_size, None))
   finished_seq.set_shape((None, beam_size, None))

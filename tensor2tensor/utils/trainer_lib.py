@@ -106,7 +106,7 @@ def next_undecoded_checkpoint(model_dir, timeout_mins=240):
 
 def create_session_config(log_device_placement=False,
                           enable_graph_rewriter=False,
-                          gpu_mem_fraction=0.95,
+                          gpu_mem_fraction=0.80,
                           use_tpu=False,
                           xla_jit_level=tf.OptimizerOptions.OFF,
                           inter_op_parallelism_threads=0,
@@ -126,7 +126,7 @@ def create_session_config(log_device_placement=False,
               do_function_inlining=False,
               global_jit_level=xla_jit_level))
 
-  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_mem_fraction)
+  gpu_options = tf.GPUOptions(allow_growth=True)
 
   config = tf.ConfigProto(
       allow_soft_placement=True,

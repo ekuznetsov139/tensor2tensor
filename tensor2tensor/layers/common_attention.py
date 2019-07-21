@@ -1587,8 +1587,8 @@ def dot_product_attention(q,
     # Drop out attention links for each head.
     weights = common_layers.dropout_with_broadcast_dims(
         weights, 1.0 - dropout_rate, broadcast_dims=dropout_broadcast_dims)
-    if common_layers.should_generate_summaries() and make_image_summary:
-      attention_image_summary(weights, image_shapes)
+    #if common_layers.should_generate_summaries() and make_image_summary:
+    #  attention_image_summary(weights, image_shapes)
     return tf.matmul(weights, v)
 
 
@@ -4586,8 +4586,8 @@ def multihead_attention(query_antecedent,
         v = split_heads(v, num_heads)
         decode_loop_step = kwargs.get("decode_loop_step")
         if decode_loop_step is None:
-          k = cache["k"] = tf.concat([cache["k"], k], axis=2)
-          v = cache["v"] = tf.concat([cache["v"], v], axis=2)
+          k = cache["k"] = tf.concat([tf.cast(cache["k"],k.dtype), k], axis=2)
+          v = cache["v"] = tf.concat([tf.cast(cache["v"],v.dtype), v], axis=2)
         else:
           # Inplace update is required for inference on TPU.
           # Inplace_ops only supports inplace_update on the first dimension.
@@ -4602,7 +4602,6 @@ def multihead_attention(query_antecedent,
           tmp_v = inplace_ops.alias_inplace_update(
               tmp_v, decode_loop_step, tf.squeeze(v, axis=2))
           v = cache["v"] = tf.transpose(tmp_v, perm=[1, 2, 0, 3])
-
     q = split_heads(q, num_heads)
     if cache is None:
       k = split_heads(k, num_heads)

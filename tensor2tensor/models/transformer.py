@@ -790,7 +790,7 @@ class Transformer(t2t_model.T2TModel):
             tf.equal(i, 0), lambda: tf.zeros_like(targets), lambda: targets)
 
       if positional_encoding is not None:
-        targets += positional_encoding[:, i:i + 1]
+        targets += tf.cast(positional_encoding[:, i:i + 1],targets.dtype)
       return targets
 
     decoder_self_attention_bias = (
@@ -807,7 +807,7 @@ class Transformer(t2t_model.T2TModel):
           encoder_output)[0:2]
       for layer in range(num_layers):
         att_cache["attention_history"]["layer_%d" % layer] = tf.zeros(
-            [att_batch_size, hparams.num_heads, 0, enc_seq_length])
+            [att_batch_size, hparams.num_heads, 0, enc_seq_length], dtype=hparams.activation_dtype)
 
     def update_decoder_attention_history(cache):
       """Save attention weights in cache, e.g., for vizualization."""
@@ -1099,7 +1099,6 @@ def fast_decode_tpu(encoder_output,
 
     def compute_cache_shape_invariants(tensor):
       return tf.TensorShape(tensor.shape.as_list())
-
     _, _, _, decoded_ids, _, log_prob = tf.while_loop(
         is_not_finished,
         inner_loop, [
@@ -1229,7 +1228,6 @@ def fast_decode(encoder_output,
 
       next_id = tf.expand_dims(next_id, axis=1)
       decoded_ids = tf.concat([decoded_ids, next_id], axis=1)
-
       return i + 1, hit_eos, next_id, decoded_ids, cache, log_prob
 
     def is_not_finished(i, hit_eos, *_):
@@ -1242,6 +1240,7 @@ def fast_decode(encoder_output,
     hit_eos = tf.fill([batch_size], False)
     next_id = sos_id * tf.ones([batch_size, 1], dtype=tf.int64)
     initial_log_prob = tf.zeros([batch_size], dtype=tf.float32)
+    #print(hit_eos, next_id, decoded_ids, cache, initial_log_prob)
     _, _, _, decoded_ids, cache, log_prob = tf.while_loop(
         is_not_finished,
         inner_loop, [
@@ -1257,7 +1256,7 @@ def fast_decode(encoder_output,
             tf.TensorShape([None]),
         ])
     scores = log_prob
-
+  scores=tf.to_float(scores)
   return {"outputs": decoded_ids, "scores": scores, "cache": cache}
 
 
