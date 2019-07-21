@@ -1587,8 +1587,8 @@ def dot_product_attention(q,
     # Drop out attention links for each head.
     weights = common_layers.dropout_with_broadcast_dims(
         weights, 1.0 - dropout_rate, broadcast_dims=dropout_broadcast_dims)
-    #if common_layers.should_generate_summaries() and make_image_summary:
-    #  attention_image_summary(weights, image_shapes)
+    if common_layers.should_generate_summaries() and make_image_summary:
+      attention_image_summary(weights, image_shapes)
     return tf.matmul(weights, v)
 
 

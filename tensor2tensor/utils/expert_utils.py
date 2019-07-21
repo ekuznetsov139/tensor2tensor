@@ -34,6 +34,8 @@ from tensor2tensor.layers.vq_discrete import DiscreteBottleneck
 
 import tensorflow as tf
 
+use_custom_scatter = True
+
 DEFAULT_DEV_STRING = "existing_device"
 
 
@@ -653,11 +655,28 @@ class PadRemover(object):
       dim is restored from the original reference tensor
     """
     with tf.name_scope("pad_reduce/restore"):
-      x = tf.scatter_nd(
-          indices=self.nonpad_ids,
-          updates=x,
-          shape=tf.concat([self.dim_origin, tf.shape(x)[1:]], axis=0),
-      )
+      # the default GPU scatter algorithm is very slow, particularly with float16
+      # this way is noticeably faster
+      must_cast=(x.dtype==tf.float16)
+      if must_cast and use_custom_scatter:
+        xf = tf.reshape(x, [-1])
+        x_axis=tf.shape(self.nonpad_ids)[0]
+        y_axis=np.prod(x.shape[1:])
+        y = tf.range(y_axis,dtype=tf.int32)
+        indices1 = tf.reshape(self.nonpad_ids * y_axis, [x_axis,1])
+        indices2 = tf.reshape(y, [1,y_axis])
+        new_indices=tf.reshape(indices1+indices2,[-1,1])
+        xf = tf.scatter_nd(
+            indices=new_indices,
+            updates=xf,
+            shape=[self.dim_origin[0]*y_axis])
+        x=tf.reshape(xf, tf.concat([self.dim_origin, tf.shape(x)[1:]], axis=0))
+      else:
+        x = tf.scatter_nd(
+            indices=self.nonpad_ids,
+            updates=x,
+            shape=tf.concat([self.dim_origin, tf.shape(x)[1:]], axis=0),
+        )
     return x
 
 

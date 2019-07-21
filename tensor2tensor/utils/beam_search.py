@@ -370,8 +370,8 @@ def compute_topk_scores_and_seq(sequences,
         if tf.is_tensor(states_to_gather[x]):
           states_to_gather[x]=tf.to_float(states_to_gather[x])
         else:
-          print(x)
-          print(states_to_gather[x])
+          #print(x)
+          #print(states_to_gather[x])
           for y in states_to_gather[x]:
             if x.startswith('layer') and (y=='k' or y=='v'):
               states_to_gather[x][y]=tf.to_float(states_to_gather[x][y])
@@ -822,7 +822,7 @@ def beam_search(symbols_to_logits_fn,
            state_struc
        ],
        parallel_iterations=1,
-       back_prop=False, name="Chicken")
+       back_prop=False)#, name="Chicken")
 
   alive_seq.set_shape((None, beam_size, None))
   finished_seq.set_shape((None, beam_size, None))
