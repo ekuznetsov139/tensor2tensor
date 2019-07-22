@@ -137,7 +137,7 @@ def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
     shape = [1 if i in broadcast_dims else shape[i] for i in range(ndims)]
     kwargs["noise_shape"] = shape
   #return x
-  if use_custom_dropout and (ndims==2 or ndims==3):
+  if use_custom_dropout and (ndims==2 or ndims==3 or ndims==4):
     zero = tf.constant(0.0, dtype=x.dtype)
     one = tf.constant(1.0, dtype=x.dtype)
     rng = tf.random.uniform(shape, minval=zero, maxval=one, dtype=x.dtype)
@@ -3087,7 +3087,17 @@ def _recompute_grad(fn, args):
 def dense(x, units, **kwargs):
   """Identical to layers.dense."""
   layer_collection = kwargs.pop("layer_collection", None)
-  activations = layers().Dense(units, **kwargs)(x)
+  #activations = layers().Dense(units, **kwargs)(x)
+  if x.shape[-1].value!=None and len(x.shape)==3:
+    sh=tf.shape(x)
+    in_shape=tf.concat([sh[:-1], tf.convert_to_tensor([units],dtype=tf.int32)], axis=0)
+    v=tf.concat([sh[0:1]*sh[1:2], sh[-1:] ],axis=0)
+    flat_shape=tf.convert_to_tensor(v,dtype=tf.int32)
+    flat_x=tf.reshape(x,flat_shape)
+    activations = layers().Dense(units, **kwargs)(flat_x)
+    activations = tf.reshape(activations,in_shape)
+  else:
+    activations = layers().Dense(units, **kwargs)(x)
   if layer_collection:
     # We need to find the layer parameters using scope name for the layer, so
     # check that the layer is named. Otherwise parameters for different layers
