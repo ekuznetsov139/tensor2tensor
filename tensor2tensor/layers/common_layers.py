@@ -3122,6 +3122,7 @@ def _recompute_grad(fn, args):
 def dense(x, units, **kwargs):
   """Identical to layers.dense."""
   layer_collection = kwargs.pop("layer_collection", None)
+  #activations = layers().Dense(units, **kwargs)(x)
   if x.shape[-1].value!=None and len(x.shape)==3:
     sh=tf.shape(x)
     in_shape=tf.concat([sh[:-1], tf.convert_to_tensor([units],dtype=tf.int32)], axis=0)
