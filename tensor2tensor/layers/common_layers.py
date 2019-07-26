@@ -3125,10 +3125,10 @@ def opt_dense(x, units, **kwargs):
     v=tf.concat([sh[0:1]*sh[1:2], sh[-1:] ],axis=0)
     flat_shape=tf.convert_to_tensor(v,dtype=tf.int32)
     flat_x=tf.reshape(x,flat_shape)
-    activations = tf.layers.dense(units, **kwargs)(flat_x)
+    activations = tf.layers.dense(flat_x,units, **kwargs)
     activations = tf.reshape(activations,in_shape)
   else:
-    activations = tf.layers.dense(units, **kwargs)(x)
+    activations = tf.layers.dense(x,units, **kwargs)
   return activations
 
 def dense(x, units, **kwargs):

@@ -141,8 +141,8 @@ def evolved_transformer_encoder(encoder_input,
           residual_state = hidden_state
           hidden_state = common_layers.layer_preprocess(hidden_state, hparams)
 
-          values = common_layers.opt_dense(hparams.hidden_size)(hidden_state)
-          gates = common_layers.opt_dense(hparams.hidden_size, activation=tf.nn.sigmoid)(hidden_state)
+          values = common_layers.opt_dense(hidden_state,hparams.hidden_size)
+          gates = common_layers.opt_dense(hidden_state,hparams.hidden_size, activation=tf.nn.sigmoid)
           hidden_state = values * gates
 
           hidden_state = common_layers.layer_postprocess(
@@ -158,8 +158,7 @@ def evolved_transformer_encoder(encoder_input,
           hidden_state *= mask
 
           left_output_dim = int(hparams.hidden_size * 4)
-          left_state = common_layers.opt_dense(
-              left_output_dim, activation=tf.nn.relu)(hidden_state)
+          left_state = common_layers.opt_dense(hidden_state, left_output_dim, activation=tf.nn.relu)
           left_state = common_layers.dropout_with_broadcast_dims(left_state,
                                      1 - hparams.layer_prepostprocess_dropout)
 
@@ -228,13 +227,12 @@ def evolved_transformer_encoder(encoder_input,
           residual_state = hidden_state
           hidden_state = common_layers.layer_preprocess(hidden_state, hparams)
 
-          hidden_state = common_layers.opt_dense(
-              int(hparams.hidden_size * 4), activation=tf.nn.relu)(hidden_state)
+          hidden_state = common_layers.opt_dense(hidden_state,
+              int(hparams.hidden_size * 4), activation=tf.nn.relu)
           hidden_state = tf.nn.dropout(hidden_state,
                                        1 - hparams.layer_prepostprocess_dropout)
 
-          hidden_state = common_layers.opt_dense(
-              hparams.hidden_size)(hidden_state)
+          hidden_state = common_layers.opt_dense(hidden_state,hparams.hidden_size)
           hidden_state = common_layers.layer_postprocess(
               residual_state, hidden_state, hparams)
 
