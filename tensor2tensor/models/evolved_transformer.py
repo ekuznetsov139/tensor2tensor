@@ -141,10 +141,8 @@ def evolved_transformer_encoder(encoder_input,
           residual_state = hidden_state
           hidden_state = common_layers.layer_preprocess(hidden_state, hparams)
 
-          values = common_layers.layers().Dense(
-              hparams.hidden_size)(hidden_state)
-          gates = common_layers.layers().Dense(
-              hparams.hidden_size, activation=tf.nn.sigmoid)(hidden_state)
+          values = common_layers.opt_dense(hparams.hidden_size)(hidden_state)
+          gates = common_layers.opt_dense(hparams.hidden_size, activation=tf.nn.sigmoid)(hidden_state)
           hidden_state = values * gates
 
           hidden_state = common_layers.layer_postprocess(
@@ -160,9 +158,9 @@ def evolved_transformer_encoder(encoder_input,
           hidden_state *= mask
 
           left_output_dim = int(hparams.hidden_size * 4)
-          left_state = common_layers.layers().Dense(
+          left_state = common_layers.opt_dense(
               left_output_dim, activation=tf.nn.relu)(hidden_state)
-          left_state = tf.nn.dropout(left_state,
+          left_state = common_layers.dropout_with_broadcast_dims(left_state,
                                      1 - hparams.layer_prepostprocess_dropout)
 
           right_output_dim = int(hparams.hidden_size / 2)
@@ -172,7 +170,7 @@ def evolved_transformer_encoder(encoder_input,
               padding="SAME",
               name="standard_conv_3x1",
               activation=tf.nn.relu)(hidden_state)
-          right_state = tf.nn.dropout(right_state,
+          right_state = common_layers.dropout_with_broadcast_dims(right_state,
                                       1 - hparams.layer_prepostprocess_dropout)
 
           right_state = tf.pad(
@@ -230,12 +228,12 @@ def evolved_transformer_encoder(encoder_input,
           residual_state = hidden_state
           hidden_state = common_layers.layer_preprocess(hidden_state, hparams)
 
-          hidden_state = common_layers.layers().Dense(
+          hidden_state = common_layers.opt_dense(
               int(hparams.hidden_size * 4), activation=tf.nn.relu)(hidden_state)
           hidden_state = tf.nn.dropout(hidden_state,
                                        1 - hparams.layer_prepostprocess_dropout)
 
-          hidden_state = common_layers.layers().Dense(
+          hidden_state = common_layers.opt_dense(
               hparams.hidden_size)(hidden_state)
           hidden_state = common_layers.layer_postprocess(
               residual_state, hidden_state, hparams)
@@ -437,14 +435,14 @@ def evolved_transformer_decoder(decoder_input,
               name="separable_conv11x1",
               activation=tf.nn.relu)
           left_state = separable_conv_11x1.apply(left_state)
-          left_state = tf.nn.dropout(left_state,
+          left_state = common_layers.dropout_with_broadcast_dims(left_state,
                                      1 - hparams.layer_prepostprocess_dropout)
 
           right_output_dim = int(hparams.hidden_size / 2)
           separable_conv_7x1_1 = tf.layers.SeparableConv1D(
               right_output_dim, 7, padding="VALID", name="separable_conv_7x1_1")
           right_state = separable_conv_7x1_1.apply(right_state)
-          right_state = tf.nn.dropout(right_state,
+          right_state = common_layers.dropout_with_broadcast_dims(right_state,
                                       1 - hparams.layer_prepostprocess_dropout)
           right_state = tf.pad(
               right_state,
@@ -573,16 +571,16 @@ def evolved_transformer_decoder(decoder_input,
           residual_state = hidden_state
           hidden_state = common_layers.layer_preprocess(hidden_state, hparams)
 
-          hidden_state = tf.layers.dense(
+          hidden_state = common_layers.opt_dense(
               hidden_state,
               int(hparams.hidden_size * 4),
               activation=tf.nn.swish)
-          hidden_state = tf.nn.dropout(hidden_state,
+          hidden_state = common_layers.dropout_with_broadcast_dims(hidden_state, 
                                        1 - hparams.layer_prepostprocess_dropout)
 
           hidden_state = common_layers.layer_preprocess(hidden_state, hparams)
 
-          hidden_state = tf.layers.dense(hidden_state, hparams.hidden_size)
+          hidden_state = common_layers.opt_dense(hidden_state, hparams.hidden_size)
           hidden_state = common_layers.layer_postprocess(
               residual_state, hidden_state, hparams)
 
