@@ -55,6 +55,7 @@ def layers():
   if _cached_layers is not None:
     return _cached_layers
   layers_module = tf.layers
+  #layers_module = tf.compat.v1.layers
   try:
     from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
     if tf2.enabled():
@@ -137,7 +138,7 @@ def dropout_with_broadcast_dims(x, keep_prob, broadcast_dims=None, **kwargs):
     shape = [1 if i in broadcast_dims else shape[i] for i in range(ndims)]
     kwargs["noise_shape"] = shape
   #return x
-  if use_custom_dropout and (ndims==2 or ndims==3):
+  if use_custom_dropout and (ndims==2 or ndims==3 or ndims==4):
     zero = tf.constant(0.0, dtype=x.dtype)
     one = tf.constant(1.0, dtype=x.dtype)
     rng = tf.random.uniform(shape, minval=zero, maxval=one, dtype=x.dtype)
@@ -1347,6 +1348,35 @@ def maybe_zero_out_padding(inputs, kernel_size, nonpadding_mask):
 
   return inputs
 
+constraint_count=0
+
+class TestConstraint(tf.keras.constraints.Constraint):
+  def __init__(self, w, h, threshold, name):
+    #print('TestConstraint', name, w, h, threshold)
+    h0=int(h*(1.0-threshold))
+    self.h0=h0
+    self.live_h=h-h0
+    global constraint_count
+    np.random.seed(constraint_count)
+    constraint_count+=1
+    if h0!=0:
+      #self.thresh = np.concatenate(
+      #  [np.ones([w, h-h0], dtype=np.float32),
+      #  np.zeros([w, h0], dtype=np.float32)], axis=1)
+      #self.add=np.concatenate(
+      #  [np.zeros([w, h-h0], dtype=np.float32),
+      #  np.random.normal(scale=1./math.sqrt(h), size=[w, h0])], axis=1)
+      #self.zz=tf.constant(np.zeros([w, h0], dtype=np.float32))
+      self.zz=tf.constant(np.random.normal(scale=1./math.sqrt(h), size=[w, h0]), dtype=np.float32)
+      #self.mask=tf.constant(self.thresh)
+      #self.add_tensor=tf.constant(self.add,dtype=tf.float32)
+  def __call__(self, w):
+    if self.h0!=0:
+      return tf.concat([w[:,:self.live_h], self.zz], axis=1)
+    else:
+      return w
+#    print(w.shape)
+    #return tf.multiply(w,self.mask)#+self.add_tensor
 
 def dense_relu_dense(inputs,
                      filter_size,
@@ -1355,28 +1385,33 @@ def dense_relu_dense(inputs,
                      dropout=0.0,
                      dropout_broadcast_dims=None,
                      layer_collection=None,
+                     unlock_rate=0.25,
                      name=None):
   """Hidden layer with RELU activation followed by linear projection."""
   # layer_name is appended with "conv1" or "conv2" in this method only for
   # historical reasons. These are in fact dense layers.
   layer_name = "%s_{}" % name if name else "{}"
+  constr1 = TestConstraint(inputs.shape[-1], filter_size, unlock_rate, layer_name)
   h = dense(
       inputs,
       filter_size,
       use_bias=True,
       activation=tf.nn.relu,
       layer_collection=layer_collection,
+      kernel_constraint=constr1,
       name=layer_name.format("conv1"))
 
   if dropout != 0.0:
     h = dropout_with_broadcast_dims(
         h, 1.0 - dropout, broadcast_dims=dropout_broadcast_dims)
+  constr2 = TestConstraint(filter_size, output_size, unlock_rate, layer_name)
   o = dense(
       h,
       output_size,
       activation=output_activation,
       use_bias=True,
       layer_collection=layer_collection,
+      kernel_constraint=constr2,
       name=layer_name.format("conv2"))
   return o
 
@@ -3087,7 +3122,16 @@ def _recompute_grad(fn, args):
 def dense(x, units, **kwargs):
   """Identical to layers.dense."""
   layer_collection = kwargs.pop("layer_collection", None)
-  activations = layers().Dense(units, **kwargs)(x)
+  if x.shape[-1].value!=None and len(x.shape)==3:
+    sh=tf.shape(x)
+    in_shape=tf.concat([sh[:-1], tf.convert_to_tensor([units],dtype=tf.int32)], axis=0)
+    v=tf.concat([sh[0:1]*sh[1:2], sh[-1:] ],axis=0)
+    flat_shape=tf.convert_to_tensor(v,dtype=tf.int32)
+    flat_x=tf.reshape(x,flat_shape)
+    activations = layers().Dense(units, **kwargs)(flat_x)
+    activations = tf.reshape(activations,in_shape)
+  else:
+    activations = layers().Dense(units, **kwargs)(x)
   if layer_collection:
     # We need to find the layer parameters using scope name for the layer, so
     # check that the layer is named. Otherwise parameters for different layers

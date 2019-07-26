@@ -93,7 +93,7 @@ def transformer_encode(encoder_function, inputs, target_space, hparams,
       hparams=hparams)
 
   encoder_input = tf.nn.dropout(encoder_input,
-                                1.0 - hparams.layer_prepostprocess_dropout)
+                                rate = hparams.layer_prepostprocess_dropout)
 
   attn_bias_for_padding = None
   # Otherwise the encoder will just use encoder_self_attention_bias.

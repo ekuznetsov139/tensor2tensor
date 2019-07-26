@@ -347,7 +347,8 @@ def basic_params1():
       num_area_layers=0,
       max_area_width=1,
       max_area_height=1,
-      memory_height=1
+      memory_height=1,
+      unlock_rate=1.0
   )
 
 

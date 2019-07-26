@@ -27,12 +27,12 @@ from tensor2tensor.utils import registry
 EOS = text_encoder.EOS_ID
 
 _ENRU_TRAIN_DATASETS = [[
-    "/share/en-ru.zip",  # pylint: disable=line-too-long
+    "gs://t2t_translate_enru/train.zip",
     ("train-en.txt","train-ru.txt")
 ]]
 
 _ENRU_TEST_DATASETS = [[
-    "/share/en-ru.zip", 
+    "gs://t2t_translate_enru/test.zip",
     ("test-en.txt","test-ru.txt")
 ]]
 

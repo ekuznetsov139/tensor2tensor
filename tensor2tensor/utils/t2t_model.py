@@ -241,7 +241,7 @@ class T2TModel(base.Layer):
     def create_hparams_summary(hparams, name):
       hparams_strs = [tf.convert_to_tensor([k, str(v)])
                       for k, v in hparams.values().items()]
-      tf.summary.text(name, tf.cast(tf.stack(hparams_strs), tf.string))
+      tf.compat.v1.summary.text(name, tf.cast(tf.stack(hparams_strs), tf.string))
 
     create_hparams_summary(self._hparams, "%s_hparams" % self.name)
     if self._problem_hparams:
@@ -1365,7 +1365,7 @@ class T2TModel(base.Layer):
         v = tf.expand_dims(v, axis=-1)
         v_shape = [1]
       if v_shape == [1]:
-        v = tf.tile(v, tf.to_int32([self._num_datashards]))
+        v = tf.tile(v, tf.cast([self._num_datashards],tf.int32))
       sharded_features[k] = self._data_parallelism(
           tf.identity, tf.split(v, self._num_datashards, 0))
     return sharded_features

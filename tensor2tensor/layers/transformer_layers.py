@@ -326,7 +326,8 @@ def transformer_ffn_layer(x,
         hparams.hidden_size,
         dropout=hparams.relu_dropout,
         dropout_broadcast_dims=relu_dropout_broadcast_dims,
-        layer_collection=layer_collection)
+        layer_collection=layer_collection,
+        unlock_rate=hparams.unlock_rate)
     if pad_remover:
       # Restore `conv_output` to the original shape of `x`, including padding.
       conv_output = tf.reshape(

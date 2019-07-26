@@ -33,6 +33,7 @@ from tensor2tensor.layers import common_layers
 from tensor2tensor.layers.vq_discrete import DiscreteBottleneck
 
 import tensorflow as tf
+import numpy as np
 
 use_custom_scatter = True
 
@@ -67,7 +68,7 @@ def add_scope(scope=None, scope_fn=None):
 
 
 def add_var_scope(scope=None):
-  return add_scope(scope, scope_fn=tf.variable_scope)
+  return add_scope(scope, scope_fn=tf.compat.v1.variable_scope)
 
 
 def add_name_scope(scope=None):

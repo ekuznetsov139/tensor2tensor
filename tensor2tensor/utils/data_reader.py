@@ -34,7 +34,7 @@ def cast_ints_to_int32(features):
   f = {}
   for k, v in sorted(six.iteritems(features)):
     if v.dtype in [tf.int64, tf.uint8]:
-      v = tf.to_int32(v)
+      v = tf.cast(v,tf.int32)
     f[k] = v
   return f
 
@@ -228,12 +228,12 @@ def _summarize_features(features, num_shards=1):
   with tf.name_scope("input_stats"):
     for (k, v) in six.iteritems(features):
       if isinstance(v, tf.Tensor) and v.get_shape().ndims > 1:
-        tf.summary.scalar("%s_batch" % k, tf.shape(v)[0] // num_shards)
-        tf.summary.scalar("%s_length" % k, tf.shape(v)[1])
-        nonpadding = tf.to_float(tf.not_equal(v, 0))
+        tf.compat.v1.summary.scalar("%s_batch" % k, tf.shape(v)[0] // num_shards)
+        tf.compat.v1.summary.scalar("%s_length" % k, tf.shape(v)[1])
+        nonpadding = tf.cast(tf.not_equal(v, 0),tf.float32)
         nonpadding_tokens = tf.reduce_sum(nonpadding)
-        tf.summary.scalar("%s_nonpadding_tokens" % k, nonpadding_tokens)
-        tf.summary.scalar("%s_nonpadding_fraction" % k,
+        tf.compat.v1.summary.scalar("%s_nonpadding_tokens" % k, nonpadding_tokens)
+        tf.compat.v1.summary.scalar("%s_nonpadding_fraction" % k,
                           tf.reduce_mean(nonpadding))
 
 

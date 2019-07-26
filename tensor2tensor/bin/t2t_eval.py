@@ -53,11 +53,16 @@ def main(_):
       FLAGS.model, hparams, config, use_tpu=FLAGS.use_tpu)
   ckpt_iter = trainer_lib.next_checkpoint(
       hparams.model_dir, FLAGS.eval_timeout_mins)
+  FLAGS.eval_steps=500
   for ckpt_path in ckpt_iter:
     predictions = estimator.evaluate(
         eval_input_fn, steps=FLAGS.eval_steps, checkpoint_path=ckpt_path)
     tf.logging.info(predictions)
-
+    loss=predictions['loss']
+    of=open('/tmp/loss.txt','w')
+    of.write(str(loss))
+    of.close()
+    exit(-1)
 
 if __name__ == "__main__":
   tf.logging.set_verbosity(tf.logging.INFO)

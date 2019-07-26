@@ -379,6 +379,32 @@ def create_estimator(model_name,
     )
   return estimator
 
+class MyHook(tf.train.SessionRunHook):
+  def __init__(self,estimator):
+    self.call_count=0
+    self.estimator=estimator
+  def before_run(self, run_context):
+    return tf.train.SessionRunArgs(fetches="transformer/body/encoder/layer_2/ffn/conv2/kernel:0")
+  def after_run(self, run_context, run_values):
+    if not (self.call_count % 1000):
+      #print(run_values)
+      val1=self.estimator.get_variable_value("transformer/body/encoder/layer_2/ffn/conv2/kernel:0")
+      for y in range(0,len(val1),len(val1)//8):
+        for x in range(0,len(val1[0]),len(val1[0])//8):
+          print('%+.7f' % val1[y][x], end="\t")
+        print()
+      print()        
+    self.call_count+=1
+
+    """
+      print(run_values)    
+    ws=run_values.results[0]
+    for y in range(0,ws.shape[1],ws.shape[1]//8):
+        for x in range(0,ws.shape[0],ws.shape[0]//8):
+          print(ws[y][x], end=" ")
+        print()
+    """
+    return None
 
 def create_hooks(use_tfdbg=False,
                  use_dbgprofile=False,
@@ -386,11 +412,12 @@ def create_hooks(use_tfdbg=False,
                  use_validation_monitor=False,
                  validation_monitor_kwargs=None,
                  use_early_stopping=False,
-                 early_stopping_kwargs=None):
+                 early_stopping_kwargs=None,
+                 estimator=None):
   """Create train and eval hooks for Experiment."""
   train_hooks = []
   eval_hooks = []
-
+  train_hooks.append(MyHook(estimator))
   if use_tfdbg:
     hook = debug.LocalCLIDebugHook()
     train_hooks.append(hook)
@@ -466,6 +493,10 @@ class T2TExperiment(object):
   def train(self, max_steps=None):
     mlperf_log.transformer_print(key=mlperf_log.TRAIN_LOOP)
     mlperf_log.transformer_print(key=mlperf_log.TRAIN_EPOCH, value=0)
+    #val1=self._estimator.get_variable_value("transformer/body/encoder/layer_2/ffn/conv1/kernel")
+    #print(val1)
+    #val2=self._estimator.get_variable_value("transformer/body/encoder/layer_2/ffn/conv1/kernel:0")
+    #print(val2)
     self._estimator.train(
         self._train_spec.input_fn,
         hooks=self._train_spec.hooks,
@@ -795,7 +826,8 @@ def create_experiment(
       use_validation_monitor=use_validation_monitor,
       validation_monitor_kwargs=validation_monitor_kwargs,
       use_early_stopping=use_early_stopping,
-      early_stopping_kwargs=early_stopping_kwargs)
+      early_stopping_kwargs=early_stopping_kwargs,
+      estimator=estimator)
 
   hook_context = HookContext(
       estimator=estimator, problem=problem, hparams=hparams)
